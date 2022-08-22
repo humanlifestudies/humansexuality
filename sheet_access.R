@@ -1,0 +1,267 @@
+
+source("utils.R")
+raw_dataset <- get_raw_dataset()
+
+data_per_participant <- create_participant_data(raw_dataset)
+# data_per_participant$Gender<-factor(data_per_participant$Gender,
+#                         c("Non-binary",gender_binaries))
+####################################################################################
+percents <- data.frame(
+  table(data_per_participant$`How do you currently keep your pubic hair?`,data_per_participant$Gender3C)/rep(table(data_per_participant$Gender3C),each=4)
+)
+colnames(percents) <- c("Hair style","Gender3C","Percent")
+
+library(ggplot2)
+library(ggthemes)
+#install.packages("hrbrthemes") # NOTE: CRAN version is 0.8.0
+library(hrbrthemes)
+# devtools::install_github('datarootsio/artyfarty')
+# library("artyfarty")
+#https://towardsdatascience.com/themes-to-spice-up-visualizations-with-ggplot2-3e275038dafa
+
+percents$Labels <- as.character(percents$`Hair style`)
+percents$Labels[percents$Percent<0.1]<-""
+ggplot(percents, aes(fill=`Hair style`, x=Gender3C,y=Percent)) + 
+  geom_bar(position="fill", stat="identity")+scale_y_continuous(labels=scales::percent_format())+
+  coord_flip()+
+  #geom_text(aes(label = str_wrap(Labels,width=10)), hjust = 0,position = position_fill(vjust = 0)) +
+  #theme_classic()+
+  #theme_fivethirtyeight()+
+  guides(fill=guide_legend(ncol=4,reverse=TRUE))+
+  theme(legend.position = "bottom",
+        text = element_text(size = 18,face = "bold",color="#bd0026"),
+        legend.text = element_text(size=22),
+        legend.background = element_rect(fill = "#ffffcc"),
+        axis.text = element_text(color="#000000",size=22),
+        plot.background = element_rect(fill = "#ffffcc"),
+        panel.background = element_rect(fill = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
+        )+
+  scale_fill_brewer(palette = "YlOrRd")+
+  #geom_text(aes(label=`Hair style`,y=Percent,x=Gender))+
+  labs(title="Hair style by Gender")
+
+
+ggplot(data_per_participant %>% filter(!is.na(`How do you currently keep your pubic hair?`) & Age<80),
+       aes(x=interaction(`How do you currently keep your pubic hair?`,Gender3C),y=Age,color=Gender3C))+
+  geom_boxplot()+
+  geom_jitter(alpha=0.2)+
+  coord_flip()
+
+cor.test(as.numeric(data_per_participant$`How do you currently keep your pubic hair?`),
+         data_per_participant$Age)
+
+data_per_participant_female<-data_per_participant %>% filter(Gender3C=="Female")
+data_per_participant_male<-data_per_participant %>% filter(Gender3C=="Male")
+
+cor.test(as.numeric(data_per_participant_female$`How do you currently keep your pubic hair?`),
+         data_per_participant_female$Age)
+
+summary(lm(as.numeric(`How do you currently keep your pubic hair?`)~Age,data_per_participant_female))
+
+cor.test(as.numeric(data_per_participant_male$`How do you currently keep your pubic hair?`),
+         data_per_participant_male$Age)
+
+#It's signifacnt!'
+data_per_participant %>% group_by(Gender3C,`How do you currently keep your pubic hair?`) %>%
+  summarize(
+  mean_age= mean(Age,na.rm=TRUE),
+  count=length(`How do you currently keep your pubic hair?`)
+)
+
+data_per_participant %>% filter(Gender3C=="Female") %>% 
+  group_by(Age<25,`How do you currently keep your pubic hair?`) %>%
+  summarize(
+    count=length(`How do you currently keep your pubic hair?`)
+  )
+
+
+data_per_participant %>% filter(Gender3C=="Female" & `Relationship type` %in% c("Committed relationship","Dating","Casual")) %>% 
+  group_by(Age<25,`How do you currently keep your pubic hair?`) %>%
+  summarize(
+    count=length(`How do you currently keep your pubic hair?`)
+  )
+
+data_per_participant %>% filter(Gender3C=="Female" & `Relationship type` %in% c("Living together","Married")) %>% 
+  group_by(Age<25,`How do you currently keep your pubic hair?`) %>%
+  summarize(
+    count=length(`How do you currently keep your pubic hair?`)
+  )
+
+
+## non-hetero relationships
+data_per_participant_nh <- data_per_participant[data_per_participant$HeteroRShip==FALSE,]
+percents_nh <- data.frame(
+  table(data_per_participant_nh$`How do you currently keep your pubic hair?`,data_per_participant_nh$Gender3C)/rep(table(data_per_participant_nh$Gender3C),each=4)
+)
+
+counts_nh <- data.frame(
+  table(data_per_participant_nh$`How do you currently keep your pubic hair?`,data_per_participant_nh$Gender3C)#/rep(table(data_per_participant_nh$Gender),each=4)
+)
+
+colnames(counts_nh) <- c("Hair style","Gender3C","Count")
+
+
+ggplot(counts_nh, aes(fill=`Hair style`, x=Gender3C,y=Count)) + 
+  geom_bar(stat="identity")+#scale_y_continuous(labels=scales::percent_format())+
+  coord_flip()+
+  #theme_classic()+
+  #theme_fivethirtyeight()+
+  guides(fill=guide_legend(ncol=4,reverse=TRUE))+
+  theme(legend.position = "bottom",text = element_text(size = 18,face = "bold"))+
+  scale_fill_brewer(palette = "YlOrRd")+
+  #geom_text(aes(label=`Hair style`,y=Percent,x=Gender))+
+  labs(title="Hair style by Gender",subtitle="People in non-HeteroRShip relationships")
+
+
+## same-sex relationships
+data_per_participant_nh <- data_per_participant[data_per_participant$SameSex==TRUE,]
+
+counts_nh <- data.frame(
+  table(data_per_participant_nh$`How do you currently keep your pubic hair?`,data_per_participant_nh$Gender3C)#/rep(table(data_per_participant_nh$Gender),each=4)
+)
+
+colnames(counts_nh) <- c("Hair style","Gender3C","Count")
+
+
+ggplot(counts_nh, aes(fill=`Hair style`, x=Gender3C,y=Count)) + 
+  geom_bar(stat="identity")+#scale_y_continuous(labels=scales::percent_format())+
+  coord_flip()+
+  #theme_classic()+
+  #theme_fivethirtyeight()+
+  guides(fill=guide_legend(ncol=4,reverse=TRUE))+
+  theme(legend.position = "bottom",text = element_text(size = 18,face = "bold"))+
+  scale_fill_brewer(palette = "YlOrRd")+
+  #geom_text(aes(label=`Hair style`,y=Percent,x=Gender))+
+  labs(title="Hair style by Gender",subtitle="People in same-sex relationships")
+
+
+## same-sex vs. straight comparison 
+data_per_participant_sss <- data_per_participant[
+  (data_per_participant$SameSex==TRUE | data_per_participant$HeteroRShip==TRUE) & 
+    data_per_participant$Gender3C!="Non-binary" & 
+    !is.na(data_per_participant$`How do you currently keep your pubic hair?`)
+    ,]
+
+data_per_participant_sss$Gender3C<-factor(data_per_participant_sss$Gender3C,c("Male","Female"))
+
+counts_sss <- data.frame(
+  table(data_per_participant_sss$`How do you currently keep your pubic hair?`,
+        data_per_participant_sss$Gender3C,
+        data_per_participant_sss$HeteroRShip)
+)
+colnames(counts_sss) <- c("Hair style","Gender3C","Straight","Count")
+
+pc_sss <- data.frame(
+  table(data_per_participant_sss$`How do you currently keep your pubic hair?`,
+        data_per_participant_sss$Gender3C,
+        data_per_participant_sss$HeteroRShip)/rep(table(data_per_participant_sss$Gender3C,data_per_participant_sss$HeteroRShip),each=4)
+)
+
+colnames(pc_sss) <- c("Hair style","Gender3C","Straight","Count")
+
+pc_sss <- pc_sss%>% arrange(Gender3C,Straight)
+labels <- c("Gay Men","Straight Men","Lesbian Women","Straight Women")
+pc_sss$Label <- factor(
+  rep(labels,each=4),
+  labels)
+
+men<-data_per_participant %>% filter(Gender3C=="Male" & (HeteroRShip | SameSex))
+men$NaturalHair <- men$`How do you currently keep your pubic hair?`=="1. Natural"
+men$FullRemoval <- men$`How do you currently keep your pubic hair?`=="4. Fully removed"
+chisq.test(men$HeteroRShip,men$`How do you currently keep your pubic hair?`)
+chisq.test(men$HeteroRShip,men$FullRemoval)
+chisq.test(men$HeteroRShip,men$NaturalHair)
+table(men$NaturalHair,men$HeteroRShip)
+ggplot(pc_sss, aes(fill=`Hair style`, x=Label,y=Count)) + 
+#ggplot(pc_sss, aes(fill=`Hair style`, x=interaction(Gender,Straight),y=Count)) + 
+  geom_bar(stat="identity")+scale_y_continuous(labels=scales::percent_format())+
+ scale_x_discrete(name="")+
+  coord_flip()+
+  #theme_classic()+
+  #theme_fivethirtyeight()+
+  guides(fill=guide_legend(ncol=4,reverse=TRUE))+
+  theme(legend.position = "bottom",text = element_text(size = 18,face = "bold"))+
+  theme(legend.position = "bottom",
+        text = element_text(size = 18,face = "bold",color="#bd0026"),
+        legend.text = element_text(size=22),
+        legend.background = element_rect(fill = "#ffffcc"),
+        axis.text = element_text(color="#000000",size=22),
+        plot.background = element_rect(fill = "#ffffcc"),
+        panel.background = element_rect(fill = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
+  )+
+  scale_fill_brewer(palette = "YlOrRd")+
+  labs(title="Hair style and Sexuality")
+
+## Hetero relationships
+
+data_hetero_rel<-data_per_participant %>% filter(
+  HeteroRShip & (`Relationship type` %in% c(
+    "Committed relationship","Living together",
+    "Married"
+    
+  )))
+data_hetero_rel$Gender2C<-factor(as.character(data_hetero_rel$Gender3C))
+
+percents <- data.frame(
+  table(data_hetero_rel$`How do you currently keep your pubic hair?`,data_hetero_rel$Gender2C,data_hetero_rel$`Relationship type`)/
+    rep(table(data_hetero_rel$Gender2C,data_hetero_rel$`Relationship type`),each=4)
+)
+colnames(percents) <- c("Hair style","Gender2C","Relationship","Percent")
+
+
+
+ggplot(percents, aes(fill=`Hair style`, x=Relationship,y=Percent)) + 
+  geom_bar(position="fill", stat="identity")+scale_y_continuous(labels=scales::percent_format())+coord_flip()+
+  #theme_classic()+
+  #theme_fivethirtyeight()+
+  guides(fill=guide_legend(ncol=4,reverse=TRUE))+
+  theme(legend.position = "bottom",
+        text = element_text(size = 18,face = "bold",color="#bd0026"),
+        legend.text = element_text(size=22),
+        legend.background = element_rect(fill = "#ffffcc"),
+        axis.text = element_text(color="#000000",size=22),
+        plot.background = element_rect(fill = "#ffffcc"),
+        panel.background = element_rect(fill = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
+  )+
+  facet_wrap(~Gender2C,nrow = 2)+
+  scale_fill_brewer(palette = "YlOrRd")+
+  #geom_text(aes(label=`Hair style`,y=Percent,x=Gender))+
+  labs(title="Hair style by relationship type",subtitle="for men and women in straight relationships")
+
+
+## linear modeling
+
+table(data_per_participant$`How do you currently keep your pubic hair?`)
+model_male<-lm(
+  as.numeric(`How do you currently keep your pubic hair?`)~Age+as.numeric(`Relationship type`)*SexDominanceNum# + (Country=="United States of America") #+as.numeric(Politics)
+  ,
+  data_per_participant %>% filter(Gender3C=="Male")
+  )
+summary(model_male)  
+table(data_per_participant$SexDominance)
+hist(data_per_participant %>% filter(Gender3C=="Male" & Country=="United States of America") %>% .$SexDominanceNum)
+
+predictions <- predict(model_male,data_per_participant)
+hist(predictions)
+
+#the model for women doesn't really work within US or non-US populations--only across it, suggesting a confound.
+model_female<-lm(
+  as.numeric(`How do you currently keep your pubic hair?`)~Age+`Relationship type`+SexDominanceNum+NotDomSub
+  ,
+  data_per_participant %>% filter(Gender3C=="Female" & (Country=="United States of America")))
+summary(model_female)  
+
+model_female<-lm(
+  as.numeric(`How do you currently keep your pubic hair?`)~Age+`Relationship type`+SexDominanceNum
+  ,
+  data_per_participant %>% filter(Gender3C=="Female" & (Country!="United States of America")))
+summary(model_female)  
+
+predictions <- predict(model_female,data_per_participant)
+hist(predictions)

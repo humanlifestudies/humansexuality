@@ -1,0 +1,13 @@
+Hair style,Gender3C,Filename
+1. Natural,Female,pattern_covered_female.png
+2. Trimmed,Female,pattern_trimmed_female.png
+3. Partially removed,Female,pattern_partial_removed_female.png
+4. Fully removed,Female,pattern_bare_female.png
+1. Natural,Male,pattern_covered_male.png
+2. Trimmed,Male,pattern_trimmed_male.png
+3. Partially removed,Male,pattern_partial_removed_male.png
+4. Fully removed,Male,pattern_bare_male.png
+1. Natural,Non-binary,pattern_covered_both.png
+2. Trimmed,Non-binary,pattern_trimmed_both.png
+3. Partially removed,Non-binary,pattern_partial_removed_both.png
+4. Fully removed,Non-binary,pattern_bare_both.png

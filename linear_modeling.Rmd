@@ -1,0 +1,311 @@
+---
+title: "Linear modeling"
+output:
+  html_document:
+    df_print: paged
+---
+
+This document breaks down the linear modeling to assess factors that seem to be important.
+
+setup:
+
+```{r}
+source("utils.R")
+raw_dataset <- get_raw_dataset()
+
+
+```
+
+```{r}
+
+source("utils.R")
+
+data_per_participant <- create_participant_data(raw_dataset)
+straight_couple_data<-create_straight_couple_data(data_per_participant)
+```
+
+# Descriptive stats
+
+Graphs of stats taht we might wanna know for modeling below
+
+```{r}
+hist(data_per_participant$AgeGap[abs(data_per_participant$AgeGap)<30],breaks = -30:30)
+```
+
+```{r}
+library(ggplot2)
+
+ggplot(data_per_participant,aes(SexDominance,PartnerSexDominance))+geom_jitter(alpha=0.2)
+```
+
+
+```{r}
+ggplot(data_per_participant,aes(PoliticalLiberalism,PartnerPoliticalLiberalism))+geom_jitter(alpha=0.2)
+```
+
+```{r}
+table(data_per_participant$MostHairRemoved12Months,data_per_participant$PartnerMostHairRemoved12Months)
+```
+```{r}
+library(dplyr)
+data_per_participant_genpref<-data_per_participant %>% filter(!is.na(PubicHairGeneralPreference))
+data.frame(table(data_per_participant_genpref$PubicHairGeneralPreference,data_per_participant_genpref$Gender3C)/
+  rep(table(data_per_participant_genpref$Gender3C),each=5))
+```
+```{r}
+primary_respondent <- data_per_participant %>% filter(SurveyRole=="PrimaryRespondent")
+table(primary_respondent$`How did you find out about this survey?`)/sum(table(primary_respondent$`How did you find out about this survey?`))
+
+surveysource<-table(primary_respondent$`How did you find out about this survey?`)
+
+table(primary_respondent$`How did you find out about this survey?`,primary_respondent$Gender3C)/matrix(surveysource,nrow=length(surveysource),ncol=3)
+```
+
+
+# Basic LM
+
+This one is a very basic model using almost all the data we have available to us. Uses all items for which we have more than 5400 individual entries (doubling up because each submission included two individuals).
+
+Also keeps interactions between them I found to be significant, and I also list non-significant (p>0.1) interactions I've tried. Did not keep gender interactions with NB or Signle relationships because the group is too small, only around 300 responses.
+
+Also includes some derived values I have tried. Again, I've listed the derived values found and not-significant
+```{r}
+table(data_per_participant$`How do you currently keep your pubic hair?`)/sum(table(data_per_participant$`How do you currently keep your pubic hair?`))
+
+
+model_basic<-lm(
+  as.numeric(`How do you currently keep your pubic hair?`)~Gender3C*AgeC + RTypeLivingTogetherVs+OutsideUSA+SurveyRole*Gender3C+`How did you find out about this survey?`
+  ,
+  data_per_participant
+  )
+summary(model_basic)  
+```
+
+
+Interactions which do not seem significant which we've tried:
+
+ - Age*IsInUSA
+ - Gender3C*`How did you find out about this survey?`
+ - Gender*Relationship type
+ - Relationship type * Age
+ - IsUSA * Gender
+ - AgeGap
+ - `Relationship type`*IsInUSA
+ - I(AgeC^2)
+
+
+# Slightly more expansive data
+
+This is data for which we have more 5000 entries.
+Removed PartnerSexDominanceNum because it was almost perfectly correlated with SexDominanceNum
+
+Also repeated sensible interactions from previous round, and tried out our own from this round. 
+
+
+```{r}
+table(data_per_participant$Politics)
+table(data_per_participant$`How do you currently keep your pubic hair?`)
+model_80pc<-lm(
+  as.numeric(`How do you currently keep your pubic hair?`)~Gender3C*AgeC + RTypeLivingTogetherVs+OutsideUSA+SurveyRole*Gender3C+`How did you find out about this survey?`+ SexDominanceNum + NotDomSub + PoliticalLiberalism*OutsideUSA + Gender3C*PoliticalLiberalism+ PartnerPoliticalLiberalism+ AgeC*SexDominanceNum
+  ,
+  data_per_participant
+  )
+summary(model_80pc)
+
+```
+
+We also tried:
+
+ - Gender3CMale:SexDominanceNum
+ -`Relationship type`*NotDomSub
+ - `Relationship type`*PoliticalLiberalism
+ - `How did you find out about this survey?`*Gender3C
+ 
+ Tried selected 3-way interactions:
+ 
+ - Age*SexDominanceNum*Gender3C
+ 
+ 
+```{r}
+table(data_per_participant$`How do you currently keep your pubic hair?`,as.numeric(data_per_participant$`How do you currently keep your pubic hair?`))
+```
+
+ 
+```{r}
+# data_male <- data_per_participant %>% filter(Gender3C=="Male")
+# predictions <- predict(model_80pc,data_male)
+# hist(predictions)
+```
+Who are the men who are most likely to shave?
+
+```{r}
+#data_male[predictions>2.65,] %>% filter(!is.na(Timestamp))
+```
+
+
+
+ 
+```{r}
+# data_female <- data_per_participant %>% filter(Gender3C=="Female")
+# predictions <- predict(model_80pc,data_female)
+# hist(predictions)
+```
+ How are the women most likely to shave?
+ 
+```{r}
+#data_female[predictions>3.4,] %>% filter(!is.na(Timestamp))
+```
+
+
+
+```{r}
+
+data_per_participant %>% filter(`Relationship type` %in% c("Committed relationship","Dating","Causal") & Gender3C=="Female" & PoliticalLiberalism<2) %>% group_by(`How do you currently keep your pubic hair?`) %>%
+  summarise(n = n()) %>%
+  mutate(freq = n / sum(n))
+  
+```
+
+
+
+```{r}
+
+data_per_participant %>% filter(`Relationship type` %in% c("Committed relationship","Dating","Causal") & Gender3C=="Female" & PoliticalLiberalism<2) %>% group_by(`How do you currently keep your pubic hair?`) %>%
+  summarise(n = n()) %>%
+  mutate(freq = n / sum(n))
+  
+```
+
+
+Women who are conservative or only lean liberal, who do not live with their partner, are likely to keep their hair fully removed.
+
+
+
+```{r}
+#data_female[predictions<2.15,] %>% filter(!is.na(Timestamp))
+```
+
+
+Women over 40 who are liberal or very liberal are most likely to go natural.
+
+
+
+```{r}
+
+data_per_participant %>% filter(Age>40 & `Relationship type`=="Married" & Gender3C=="Female" & PoliticalLiberalism>1) %>% group_by(`How do you currently keep your pubic hair?`) %>%
+  summarise(n = n()) %>%
+  mutate(freq = n / sum(n))
+  
+```
+
+
+## Men who are submissive vs those who aren't.
+
+Men who lean dominant:
+```{r}
+data_per_participant %>% filter(Gender3C=="Male" & SexDominanceNum>1) %>% group_by(`How do you currently keep your pubic hair?`) %>%
+  summarise(n = n()) %>%
+  mutate(freq = n / sum(n))
+```
+
+Men who are submissive:
+
+```{r}
+data_per_participant %>% filter(Gender3C=="Male" & SexDominanceNum< 0) %>% group_by(`How do you currently keep your pubic hair?`) %>%
+  summarise(n = n()) %>%
+  mutate(freq = n / sum(n))
+
+```
+
+## Men only
+
+### Basic
+
+(need to go through and test interactions)
+
+```{r}
+table(data_per_participant$`How do you currently keep your pubic hair?`)
+model_basic<-lm(
+  as.numeric(`How do you currently keep your pubic hair?`)~AgeC + RTypeLivingTogetherVs+OutsideUSA+SurveyRole+`How did you find out about this survey?`+HeteroRShip
+  ,
+  data_per_participant %>% filter(Gender3C=="Male")
+  )
+summary(model_basic)  
+```
+
+```{r}
+men_only<-data_per_participant %>% filter(Gender3C=="Male")
+table(men_only$SurveyRole,men_only$`How do you currently keep your pubic hair?`)/matrix(table(men_only$SurveyRole),ncol = 4,nrow=2)
+```
+
+
+
+### Expansive
+
+(need to go through and test interactions)
+
+
+```{r}
+table(data_per_participant$Politics)
+table(data_per_participant$`How do you currently keep your pubic hair?`)
+model_80pc<-lm(
+  as.numeric(`How do you currently keep your pubic hair?`)~AgeC + RTypeLivingTogetherVs+OutsideUSA+`How did you find out about this survey?`+ SexDominanceNum + NotDomSub + OutsideUSA + PoliticalLiberalism+AgeC*SexDominanceNum+HeteroRShip
+  ,
+  data_per_participant %>% filter(Gender3C=="Male")
+  )
+print(dim(model_80pc$model))
+summary(model_80pc)
+
+```
+
+## Women only
+
+### Basic
+
+(need to go through and test interactions)
+
+
+```{r}
+table(data_per_participant$`How do you currently keep your pubic hair?`)
+model_basic<-lm(
+  as.numeric(`How do you currently keep your pubic hair?`)~AgeC + `Relationship type`+OutsideUSA+SurveyRole+`How did you find out about this survey?`+HeteroRShip
+  ,
+  data_per_participant %>% filter(Gender3C=="Female")
+  )
+summary(model_basic)  
+```
+
+### Expansive 
+
+(need to go through and test interactions)
+```{r}
+table(data_per_participant$`Relationship type`,as.numeric(data_per_participant$`Relationship type`))
+median(as.numeric(data_per_participant$`Relationship type`),na.rm = TRUE)
+```
+
+```{r}
+model_80pc<-lm(
+  as.numeric(`How do you currently keep your pubic hair?`)~`Relationship type`+OutsideUSA+SurveyRole+`How did you find out about this survey?`+ SexDominanceNum + NotDomSub + PoliticalLiberalism+PartnerPoliticalLiberalism+SexDominanceNum+AgeC+HeteroRShip+OutsideUSA*PoliticalLiberalism
+  ,
+  data_per_participant %>% filter(Gender3C=="Female")
+  )
+print(dim(model_80pc$model))
+
+summary(model_80pc)
+
+
+```
+
+
+
+ - Gender3CMale:SexDominanceNum
+ -`Relationship type`*NotDomSub
+ - `Relationship type`*PoliticalLiberalism
+ - OutsideUSA*PoliticalLiberalism
+ 
+
+```{r}
+women_only<-data_per_participant %>% filter(Gender3C=="Female")
+table(women_only$SurveyRole,women_only$`How do you currently keep your pubic hair?`)/matrix(table(women_only$SurveyRole),ncol = 4,nrow=2)
+```
+ 

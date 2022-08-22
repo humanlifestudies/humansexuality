@@ -1,0 +1,522 @@
+---
+title: "Linear modeling"
+output: html_notebook
+---
+
+This document breaks down the linear modeling to assess factors that seem to be important.
+
+setup:
+
+```{r}
+source("utils.R")
+raw_dataset <- get_raw_dataset()
+```
+
+```{r}
+
+source("utils.R")
+
+data_per_participant <- create_participant_data(raw_dataset)
+
+```
+
+# Descriptive stats
+
+Graphs of stats taht we might wanna know for modeling below
+
+```{r}
+hist(data_per_participant$AgeGap[abs(data_per_participant$AgeGap)<30],breaks = -30:30)
+```
+
+Need to know if this is really valid thuogh--how many people in each group?
+```{r}
+# table(dts$`How do you currently keep your pubic hair?`, dts$Politics, dts$Gender3C)
+```
+
+```{r}
+table(data_per_participant$`How do you currently keep your pubic hair?`, data_per_participant$Politics5L, data_per_participant$Gender3C)
+```
+
+
+#General gender breakdown
+<!--```{r fig.width=6,fig.height=4.5}-->
+```{r fig.width=20,fig.height=16}
+
+dts<-data_per_participant #%>% filter(Gender3C %in% )
+dts$Gender3C<-factor(dts$Gender3C,c("Female","Male"))
+crosstabs <- table(dts$`How do you currently keep your pubic hair?`, dts$Politics5L, dts$Gender3C)/rep(table(dts$Politics5L,dts$Gender3C),each=4)
+percents <- data.frame(
+  crosstabs
+)
+
+print(crosstabs)
+
+colnames(percents) <- c("Hair style","Politics","Gender3C","Percent")
+
+percents$`Hair style`<-factor(percents$`Hair style`,levels=rev(levels(percents$`Hair style`)))
+library(ggplot2)
+library(ggthemes)
+#install.packages("hrbrthemes") # NOTE: CRAN version is 0.8.0
+library(hrbrthemes)
+# devtools::install_github('datarootsio/artyfarty')
+# library("artyfarty")
+#https://towardsdatascience.com/themes-to-spice-up-visualizations-with-ggplot2-3e275038dafa
+
+pattern_named_vec<-get_pattern_named_vec("image_key.csv","images/indpat5/")
+
+percents$Labels <- as.character(percents$`Hair style`)
+percents$Labels[percents$Percent<0.1]<-""
+politics_labels_tidy<-function(charvec){stringr::str_replace_all(stringr::str_replace_all(charvec," or ", " / "),"-wing","")}
+percents$Politics<-factor(politics_labels_tidy(as.character(percents$Politics)),levels= politics_labels_tidy(as.character(levels(percents$Politics))))
+
+text_size <-25
+ggplot_politics_base<-ggplot(percents, aes(fill=`Hair style`, x=Politics,y=Percent)) + 
+  #geom_bar(position="fill", stat="identity")+
+  geom_col_pattern(
+    aes(fill=`Hair style`,pattern_filename=interaction(`Hair style`,Gender3C)),
+    pattern = 'image', pattern_gravity = "center", pattern_type= 'none',pattern_scale = -2
+    )+
+  scale_pattern_filename_manual(values = pattern_named_vec) +
+  guides(pattern_filename="none")+
+  scale_y_continuous(labels=scales::percent_format())+
+  scale_x_discrete(labels = function(x) str_wrap(x,width=15))+
+  coord_flip()+
+  #geom_text(aes(label = str_wrap(Labels,width=10)), hjust = 0,position = position_fill(vjust = 0)) +
+  #theme_classic()+
+  #theme_fivethirtyeight()+
+  #facet_grid(Gender3C~.)+
+  guides(fill=guide_legend(ncol=4,reverse=TRUE))+
+  theme(legend.position = "bottom",
+        text = element_text(size = text_size,face = "bold",color="#bd0026"),
+        legend.text = element_text(size=text_size),
+        legend.background = element_rect(fill = "#ffffcc"),
+        axis.text = element_text(color="#000000",size=text_size),
+        plot.background = element_rect(fill = "#ffffcc"),
+        panel.background = element_rect(fill = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.text = element_text(color="#000000",size=text_size)
+        )+
+  scale_fill_brewer(palette = "YlOrRd")+
+  #geom_text(aes(label=`Hair style`,y=Percent,x=Gender))+
+  labs(title="Hair style by Gender")
+
+#print(ggplot_politics_base+facet_grid(Gender3C~.))
+  
+
+
+
+```
+
+
+```{r fig.width=40,fig.height=10}
+print(ggplot_politics_base+facet_grid(.~Gender3C))
+```
+
+```{r fig.width=40,fig.height=10}
+percents$PoliticsInt<-as.integer(percents$Politics)
+#percents_max %>% select(PoliticsInt %in% c(max(PoliticsInt))
+ggplot_politics_area_base<-ggplot(percents, aes(fill=`Hair style`, x=PoliticsInt,y=Percent)) + 
+  geom_area_pattern(aes(fill=`Hair style`,pattern_filename=interaction(`Hair style`,Gender3C)),
+    alpha=1.0,pattern = 'image', pattern_gravity = "center", pattern_type= 'none',pattern_scale = -2
+    )+
+  scale_pattern_filename_manual(values = pattern_named_vec) +
+  guides(pattern_filename="none")+
+  scale_y_continuous(labels=scales::percent_format())+
+  #scale_x_discrete(labels = function(x) str_wrap(x,width=15))+
+  scale_x_continuous(labels=levels(percents$Politics))+
+  geom_vline(xintercept=(1:length(unique(percents$Politics))),color="#333333")+
+  coord_flip()+
+  guides(fill=guide_legend(ncol=4,reverse=TRUE))+
+  theme(legend.position = "bottom",
+        text = element_text(size = 18,face = "bold",color="#bd0026"),
+        legend.text = element_text(size=18),
+        legend.background = element_rect(fill = "#ffffcc"),
+        axis.text = element_text(color="#000000",size=18),
+        plot.background = element_rect(fill = "#ffffcc"),
+        panel.background = element_rect(fill = "black"),
+        panel.grid.major  = element_blank(),
+        panel.grid.minor = element_blank(),
+        #panel.grid.minor.y = element_blank(),
+        strip.text = element_text(color="#000000",size=18)
+        )+
+  scale_fill_brewer(palette = "YlOrRd")+
+  #geom_text(aes(label=`Hair style`,y=Percent,x=Gender))+
+  labs(title="Hair style by Gender")
+
+print(ggplot_politics_area_base+facet_grid(.~Gender3C))
+
+
+```
+
+
+
+
+```{r}
+counts <- data.frame(
+  table( dts$Politics5L)
+)
+counts
+```
+
+
+Women living or not living with their partner...
+
+```{r}
+dts<-data_per_participant %>% filter(Gender3C=="Female") #%>% filter(`Relationship type` %in% c("Committed relationship","Dating","Casual"))
+table(dts$`How do you currently keep your pubic hair?`, dts$Politics4L, dts$MarriedOrLivingTogether)
+
+```
+
+
+```{r fig.width=20,fig.height=5}
+
+percents <- data.frame(
+  table(dts$`How do you currently keep your pubic hair?`, dts$Politics4L, dts$MarriedOrLivingTogether)/rep(table(dts$Politics4L,dts$MarriedOrLivingTogether),each=4)
+)
+colnames(percents) <- c("Hair style","Politics","MarriedOrLivingTogether","Percent")
+
+library(ggplot2)
+library(ggthemes)
+#install.packages("hrbrthemes") # NOTE: CRAN version is 0.8.0
+library(hrbrthemes)
+# devtools::install_github('datarootsio/artyfarty')
+# library("artyfarty")
+#https://towardsdatascience.com/themes-to-spice-up-visualizations-with-ggplot2-3e275038dafa
+
+percents$Labels <- as.character(percents$`Hair style`)
+percents$Labels[percents$Percent<0.1]<-""
+ggplot(percents, aes(fill=`Hair style`, x=Politics,y=Percent)) + 
+  geom_bar(position="fill", stat="identity")+scale_y_continuous(labels=scales::percent_format())+
+  coord_flip()+
+  #geom_text(aes(label = str_wrap(Labels,width=10)), hjust = 0,position = position_fill(vjust = 0)) +
+  #theme_classic()+
+  #theme_fivethirtyeight()+
+  facet_grid(~MarriedOrLivingTogether)+
+  guides(fill=guide_legend(ncol=4,reverse=TRUE))+
+  theme(legend.position = "bottom",
+        text = element_text(size = 18,face = "bold",color="#bd0026"),
+        legend.text = element_text(size=22),
+        legend.background = element_rect(fill = "#ffffcc"),
+        axis.text = element_text(color="#000000",size=22),
+        plot.background = element_rect(fill = "#ffffcc"),
+        panel.background = element_rect(fill = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
+        )+
+  scale_fill_brewer(palette = "YlOrRd")+
+  #geom_text(aes(label=`Hair style`,y=Percent,x=Gender))+
+  labs(title="Hair style by Gender")
+
+
+
+```
+
+
+```{r fig.width=20,fig.height=5}
+dts<-data_per_participant %>% filter(MarriedOrLivingTogether)
+dts$Gender3C<-factor(dts$Gender3C,c("Male","Female"))
+percents <- data.frame(
+  table(dts$`How do you currently keep your pubic hair?`, dts$Politics4L, dts$Gender3C)/rep(table(dts$Politics4L,dts$Gender3C),each=4)
+)
+colnames(percents) <- c("Hair style","Politics","Gender3C","Percent")
+
+library(ggplot2)
+library(ggthemes)
+#install.packages("hrbrthemes") # NOTE: CRAN version is 0.8.0
+library(hrbrthemes)
+# devtools::install_github('datarootsio/artyfarty')
+# library("artyfarty")
+#https://towardsdatascience.com/themes-to-spice-up-visualizations-with-ggplot2-3e275038dafa
+
+percents$Labels <- as.character(percents$`Hair style`)
+percents$Labels[percents$Percent<0.1]<-""
+ggplot(percents, aes(fill=`Hair style`, x=Politics,y=Percent)) + 
+  geom_bar(position="fill", stat="identity")+scale_y_continuous(labels=scales::percent_format())+
+  coord_flip()+
+  #geom_text(aes(label = str_wrap(Labels,width=10)), hjust = 0,position = position_fill(vjust = 0)) +
+  #theme_classic()+
+  #theme_fivethirtyeight()+
+  facet_grid(~Gender3C)+
+  guides(fill=guide_legend(ncol=4,reverse=TRUE))+
+  theme(legend.position = "bottom",
+        text = element_text(size = 18,face = "bold",color="#bd0026"),
+        legend.text = element_text(size=22),
+        legend.background = element_rect(fill = "#ffffcc"),
+        axis.text = element_text(color="#000000",size=22),
+        plot.background = element_rect(fill = "#ffffcc"),
+        panel.background = element_rect(fill = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
+        )+
+  scale_fill_brewer(palette = "YlOrRd")+
+  #geom_text(aes(label=`Hair style`,y=Percent,x=Gender))+
+  labs(title="Hair style by Gender",subtitle="Married or living together")
+
+
+
+```
+
+
+
+```{r fig.width=20,fig.height=5}
+dts<-data_per_participant %>% filter(MarriedOrLivingTogether==FALSE)
+dts$Gender3C<-factor(dts$Gender3C,c("Male","Female"))
+percents <- data.frame(
+  table(dts$`How do you currently keep your pubic hair?`, dts$Politics4L, dts$Gender3C)/rep(table(dts$Politics4L,dts$Gender3C),each=4)
+)
+colnames(percents) <- c("Hair style","Politics","Gender3C","Percent")
+
+library(ggplot2)
+library(ggthemes)
+#install.packages("hrbrthemes") # NOTE: CRAN version is 0.8.0
+library(hrbrthemes)
+# devtools::install_github('datarootsio/artyfarty')
+# library("artyfarty")
+#https://towardsdatascience.com/themes-to-spice-up-visualizations-with-ggplot2-3e275038dafa
+
+percents$Labels <- as.character(percents$`Hair style`)
+percents$Labels[percents$Percent<0.1]<-""
+ggplot(percents, aes(fill=`Hair style`, x=Politics,y=Percent)) + 
+  geom_bar(position="fill", stat="identity")+scale_y_continuous(labels=scales::percent_format())+
+  coord_flip()+
+  #geom_text(aes(label = str_wrap(Labels,width=10)), hjust = 0,position = position_fill(vjust = 0)) +
+  #theme_classic()+
+  #theme_fivethirtyeight()+
+  facet_grid(~Gender3C)+
+  guides(fill=guide_legend(ncol=4,reverse=TRUE))+
+  theme(legend.position = "bottom",
+        text = element_text(size = 18,face = "bold",color="#bd0026"),
+        legend.text = element_text(size=22),
+        legend.background = element_rect(fill = "#ffffcc"),
+        axis.text = element_text(color="#000000",size=22),
+        plot.background = element_rect(fill = "#ffffcc"),
+        panel.background = element_rect(fill = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
+        )+
+  scale_fill_brewer(palette = "YlOrRd")+
+  #geom_text(aes(label=`Hair style`,y=Percent,x=Gender))+
+  labs(title="Hair style by Gender",subtitle="living separately or casual")
+
+
+
+```
+
+
+
+
+## Age
+
+
+
+
+```{r fig.width=20,fig.height=5}
+
+data_per_participant$AgeGroup<-floor((data_per_participant$Age+2)/5)*5-2
+dts<-data_per_participant %>% filter(`Relationship type`=="Committed relationship" & Age<43)
+dts$Gender3C<-factor(dts$Gender3C,c("Male","Female"))
+percents <- data.frame(
+  table(dts$`How do you currently keep your pubic hair?`, dts$AgeGroup, dts$Gender3C)/rep(table(dts$AgeGroup,dts$Gender3C),each=4)
+)
+colnames(percents) <- c("Hair style","AgeGroup","Gender3C","Percent")
+
+library(ggplot2)
+library(ggthemes)
+#install.packages("hrbrthemes") # NOTE: CRAN version is 0.8.0
+library(hrbrthemes)
+# devtools::install_github('datarootsio/artyfarty')
+# library("artyfarty")
+#https://towardsdatascience.com/themes-to-spice-up-visualizations-with-ggplot2-3e275038dafa
+
+percents$Labels <- as.character(percents$`Hair style`)
+percents$Labels[percents$Percent<0.1]<-""
+ggplot(percents, aes(fill=`Hair style`, x=AgeGroup,y=Percent)) + 
+  geom_bar(position="fill", stat="identity")+scale_y_continuous(labels=scales::percent_format())+
+  coord_flip()+
+  #geom_text(aes(label = str_wrap(Labels,width=10)), hjust = 0,position = position_fill(vjust = 0)) +
+  #theme_classic()+
+  #theme_fivethirtyeight()+
+  facet_grid(~Gender3C)+
+  guides(fill=guide_legend(ncol=4,reverse=TRUE))+
+  theme(legend.position = "bottom",
+        text = element_text(size = 18,face = "bold",color="#bd0026"),
+        legend.text = element_text(size=22),
+        legend.background = element_rect(fill = "#ffffcc"),
+        axis.text = element_text(color="#000000",size=22),
+        plot.background = element_rect(fill = "#ffffcc"),
+        panel.background = element_rect(fill = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
+        )+
+  scale_fill_brewer(palette = "YlOrRd")+
+  #geom_text(aes(label=`Hair style`,y=Percent,x=Gender))+
+  labs(title="Hair style by Gender",subtitle="Age group (5 year brackets) for people in committed relationships living apart")
+
+
+
+```
+
+
+#By politics and Partner's politics...
+
+
+
+```{r fig.width=20,fig.height=16}
+
+dts<-data_per_participant #%>% filter(Gender3C %in% )
+dts$Gender3C<-factor(dts$Gender3C,c("Female","Male"))
+
+crosstabs <- table(dts$`How do you currently keep your pubic hair?`, dts$PartnerPolitics5L, dts$Gender3C)/rep(table(dts$PartnerPolitics5L,dts$Gender3C),each=4)
+print(crosstabs)
+percents <- data.frame(
+  crosstabs
+)
+
+
+colnames(percents) <- c("Hair style","PartnerPolitics","Gender3C","Percent")
+
+
+percents$`Hair style`<-factor(percents$`Hair style`,levels=rev(levels(percents$`Hair style`)))
+library(ggplot2)
+library(ggthemes)
+#install.packages("hrbrthemes") # NOTE: CRAN version is 0.8.0
+library(hrbrthemes)
+# devtools::install_github('datarootsio/artyfarty')
+# library("artyfarty")
+#https://towardsdatascience.com/themes-to-spice-up-visualizations-with-ggplot2-3e275038dafa
+
+percents$Labels <- as.character(percents$`Hair style`)
+percents$Labels[percents$Percent<0.1]<-""
+politics_labels_tidy<-function(charvec){stringr::str_replace_all(stringr::str_replace_all(charvec," or ", " / "),"-wing","")}
+percents$PartnerPolitics<-factor(politics_labels_tidy(as.character(percents$PartnerPolitics)),levels= politics_labels_tidy(as.character(levels(percents$PartnerPolitics))))
+ggplot(percents, aes(fill=`Hair style`, x=PartnerPolitics,y=Percent)) + 
+  geom_bar(position="fill", stat="identity")+scale_y_continuous(labels=scales::percent_format())+
+  scale_x_discrete(labels = function(x) str_wrap(x,width=15))+
+  coord_flip()+
+  #geom_text(aes(label = str_wrap(Labels,width=10)), hjust = 0,position = position_fill(vjust = 0)) +
+  #theme_classic()+
+  #theme_fivethirtyeight()+
+  facet_grid(Gender3C~.)+
+  guides(fill=guide_legend(ncol=4,reverse=TRUE))+
+  theme(legend.position = "bottom",
+        text = element_text(size = 18,face = "bold",color="#bd0026"),
+        legend.text = element_text(size=18),
+        legend.background = element_rect(fill = "#ffffcc"),
+        axis.text = element_text(color="#000000",size=18),
+        plot.background = element_rect(fill = "#ffffcc"),
+        panel.background = element_rect(fill = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.text = element_text(color="#000000",size=18)
+        )+
+  scale_fill_brewer(palette = "YlOrRd")+
+  #geom_text(aes(label=`Hair style`,y=Percent,x=Gender))+
+  labs(title="Hair style by Gender")
+
+
+
+```
+
+
+## crosstabs
+
+
+```{r}
+table(dts$`How do you currently keep your pubic hair?`, dts$Politics4L,dts$PartnerPolitics4L, dts$Gender3C)
+```
+
+
+
+
+```{r fig.width=20,fig.height=8}
+
+dts<-data_per_participant %>% filter(Gender3C=="Female")
+
+percents <- data.frame(
+  table(dts$`How do you currently keep your pubic hair?`, dts$Politics4L,dts$PartnerPolitics4L, dts$Gender3C)/rep(table(dts$Politics4L,dts$PartnerPolitics4L,dts$Gender3C),each=4)
+)
+colnames(percents) <- c("Hair style","Politics", "Partner's Politics","Gender3C","Percent")
+
+library(ggplot2)
+library(ggthemes)
+#install.packages("hrbrthemes") # NOTE: CRAN version is 0.8.0
+library(hrbrthemes)
+# devtools::install_github('datarootsio/artyfarty')
+# library("artyfarty")
+#https://towardsdatascience.com/themes-to-spice-up-visualizations-with-ggplot2-3e275038dafa
+
+percents$Labels <- as.character(percents$`Hair style`)
+percents$Labels[percents$Percent<0.1]<-""
+ggplot(percents, aes(fill=`Hair style`, x=`Partner's Politics`,y=Percent)) + 
+  geom_bar(position="fill", stat="identity")+scale_y_continuous(labels=scales::percent_format())+
+  coord_flip()+
+  #geom_text(aes(label = str_wrap(Labels,width=10)), hjust = 0,position = position_fill(vjust = 0)) +
+  #theme_classic()+
+  #theme_fivethirtyeight()+
+  facet_wrap(~Politics,nrow=2)+
+  guides(fill=guide_legend(ncol=4,reverse=TRUE))+
+  theme(legend.position = "bottom",
+        text = element_text(size = 18,face = "bold",color="#bd0026"),
+        legend.text = element_text(size=22),
+        legend.background = element_rect(fill = "#ffffcc"),
+        axis.text = element_text(color="#000000",size=22),
+        plot.background = element_rect(fill = "#ffffcc"),
+        panel.background = element_rect(fill = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
+        )+
+  scale_fill_brewer(palette = "YlOrRd")+
+  #geom_text(aes(label=`Hair style`,y=Percent,x=Gender))+
+  labs(title="Women's Hair style by politics and partner's politics")
+
+
+
+```
+
+
+
+```{r fig.width=20,fig.height=8}
+
+dts<-data_per_participant %>% filter(Gender3C=="Female" & dts$Politics4L=="Mainstream liberal or left-wing")
+
+percents <- data.frame(
+  table(dts$`How do you currently keep your pubic hair?`, dts$PartnerPolitics4L)/rep(table(dts$PartnerPolitics4L),each=4)
+)
+colnames(percents) <- c("Hair style","Partner's Politics","Percent")
+
+library(ggplot2)
+library(ggthemes)
+#install.packages("hrbrthemes") # NOTE: CRAN version is 0.8.0
+library(hrbrthemes)
+# devtools::install_github('datarootsio/artyfarty')
+# library("artyfarty")
+#https://towardsdatascience.com/themes-to-spice-up-visualizations-with-ggplot2-3e275038dafa
+
+percents$Labels <- as.character(percents$`Hair style`)
+percents$Labels[percents$Percent<0.1]<-""
+ggplot(percents, aes(fill=`Hair style`, x=`Partner's Politics`,y=Percent)) + 
+  geom_bar(position="fill", stat="identity")+scale_y_continuous(labels=scales::percent_format())+
+  coord_flip()+
+  #geom_text(aes(label = str_wrap(Labels,width=10)), hjust = 0,position = position_fill(vjust = 0)) +
+  #theme_classic()+
+  #theme_fivethirtyeight()+
+  #facet_wrap(~Politics,nrow=2)+
+  guides(fill=guide_legend(ncol=4,reverse=TRUE))+
+  theme(legend.position = "bottom",
+        text = element_text(size = 18,face = "bold",color="#bd0026"),
+        legend.text = element_text(size=22),
+        legend.background = element_rect(fill = "#ffffcc"),
+        axis.text = element_text(color="#000000",size=22),
+        plot.background = element_rect(fill = "#ffffcc"),
+        panel.background = element_rect(fill = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
+        )+
+  scale_fill_brewer(palette = "YlOrRd")+
+  #geom_text(aes(label=`Hair style`,y=Percent,x=Gender))+
+  labs(title="Women's Hair style by partner's politics (woman's own politics mainstream liberal")
+
+
+
+```

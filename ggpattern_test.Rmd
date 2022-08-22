@@ -1,0 +1,146 @@
+---
+title: "Data"
+output: html_notebook
+---
+
+This is the basic first notebook for various comparisons
+
+setup:
+```{r}
+
+source("utils.R")
+raw_dataset <- get_raw_dataset()
+
+data_per_participant <- create_participant_data(raw_dataset)
+
+```
+
+#basic
+
+```{r}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# filenames of images
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+logo_filename   <- system.file("img", "Rlogo.png" , package="png")
+magpie_filename <- system.file("img", "magpie.jpg", package="ggpattern")
+bug_filename    <- system.file("img", "bug.jpg"   , package="ggpattern")
+
+seamless1 <- system.file("img", "seamless1.jpg"   , package="ggpattern")
+seamless2 <- system.file("img", "seamless2.jpg"   , package="ggpattern")
+seamless3 <- system.file("img", "seamless3.jpg"   , package="ggpattern")
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Plotting data
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+df1 <- data.frame(
+  trt      = c("a", "b", "c"), 
+  outcome  = c(2.3, 1.9, 3.2),
+  gravity  = c('South', 'North', 'West'),
+  filltype = c('squish', 'fit' , 'expand'),
+  scale    = c(1, 2, 0.5),
+  filename = c(logo_filename, magpie_filename, bug_filename),
+  stringsAsFactors = FALSE
+)
+
+ggplot(df1, aes(trt, outcome)) +
+  geom_col_pattern(
+    aes(
+      fill            = trt,
+      pattern_gravity = I(gravity),
+      pattern_scale   = I(scale)
+    ), 
+    pattern          = 'image', 
+    pattern_filename = logo_filename,
+    pattern_type     = 'none',
+    colour           = 'black'
+  ) +
+  theme_bw(15) +
+  labs(
+    title    = "ggpattern::geom_col_pattern()",
+    subtitle = "pattern = 'image', pattern_type = 'none'"
+  ) +
+  theme(legend.key.size = unit(1.5, 'cm')) +
+  coord_fixed(ratio = 1/2)
+```
+
+
+#General gender breakdown
+
+```{r fig.width=20,fig.height=9}
+
+image_folder <- "images/indpat5/"
+      
+trimmmed_female <- paste0(image_folder,"pattern_trimmed_female.png")
+trimmmed_male <- paste0(image_folder,"pattern_trimmed_male.png")
+
+
+get_pattern_named_vec<-function(image_key,image_folder){
+  image_key_df <- read_csv("image_key.csv")
+  image_key_df$key_interaction<-interaction(image_key_df$`Hair style`,image_key_df$Gender3C)
+  image_key_named_vec<-paste0(image_folder,image_key_df$Filename)
+  names(image_key_named_vec)<-image_key_df$key_interaction
+  return(image_key_named_vec)
+}
+percents <- data.frame(
+  table(data_per_participant$`How do you currently keep your pubic hair?`,data_per_participant$Gender3C)/rep(table(data_per_participant$Gender3C),each=4)
+)
+
+image_key_df <- read_csv("image_key.csv")
+image_key_df$key_interaction<-interaction(image_key_df$`Hair style`,image_key_df$Gender3C)
+image_key_named_vec<-paste0(image_folder,image_key_df$Filename)
+names(image_key_named_vec)<-image_key_df$key_interaction
+
+colnames(percents) <- c("Hair style","Gender3C","Percent")
+logo_filename   <- system.file("img", "Rlogo.png" , package="png")
+library(ggplot2)
+library(ggthemes)
+#install.packages("hrbrthemes") # NOTE: CRAN version is 0.8.0
+library(hrbrthemes)
+library(ggpattern)
+# devtools::install_github('datarootsio/artyfarty')
+# library("artyfarty")
+#https://towardsdatascience.com/themes-to-spice-up-visualizations-with-ggplot2-3e275038dafa
+
+
+percents$Labels <- as.character(percents$`Hair style`)
+percents$Labels[percents$Percent<0.1]<-""
+percents$`Hair style`<-factor(percents$`Hair style`,levels = rev(levels(percents$`Hair style`)))
+
+#pattern_map <-rep(c(pattern_1_filepath,pattern_2_filepath),2)
+pattern_map <-rep(c(bw_test,bw_test),6)
+names(pattern_map)<-levels(percents$`Hair style`)
+
+#add images
+percents$pattern_filepath<-""
+#percents[percents$`Hair style`=="3. Partially removed","pattern_filepath"]<-pattern_1_filepath
+#percents[percents$`Hair style`!="3. Partially removed","pattern_filepath"]<-logo_filename
+
+#add technical elements for patterning
+ggplot(percents, aes(fill=`Hair style`, x=Gender3C,y=Percent)) +
+  geom_col_pattern(
+    aes(fill=`Hair style`,pattern_filename=interaction(`Hair style`,Gender3C)),
+    pattern = 'image', pattern_gravity = "center", pattern_type= 'none',pattern_scale = -2
+    )+
+  scale_pattern_filename_manual(values = image_key_named_vec) +
+  guides(pattern_filename="none")+
+  scale_y_continuous(labels=scales::percent_format())+
+  coord_flip()+
+  theme(legend.position = "bottom",
+        text = element_text(size = 18,face = "bold",color="#bd0026"),
+        legend.text = element_text(size=18),
+        legend.background = element_rect(fill = "#ffffcc"),
+        axis.text = element_text(color="#000000",size=22),
+        plot.background = element_rect(fill = "#ffffcc"),
+        panel.background = element_rect(fill = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
+        )+
+  #scale_fill_brewer(palette = "YlOrRd",guide = guide_legend(override.aes = list(pattern = "none")))+
+  scale_fill_brewer(palette = "YlOrRd")+
+  #geom_text(aes(label=`Hair style`,y=Percent,x=Gender))+
+  labs(title="Hair style by Gender")
+
+
+
+```

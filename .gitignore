@@ -1,0 +1,7 @@
+.Rdata
+.Rhistory
+.RData
+.Rproj.user/*
+.DS_Store
+config.yaml
+config.yml

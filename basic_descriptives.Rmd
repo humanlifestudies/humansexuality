@@ -1,0 +1,100 @@
+---
+title: "basic_descriptives"
+date: "8/20/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+source("utils.R")
+raw_dataset <- get_raw_dataset()
+
+data_per_participant <- create_participant_data(raw_dataset)
+
+```
+
+
+```{r}
+library(ggplot2)
+
+
+```
+
+```{r}
+ggplot(data_per_participant %>% filter(Age<80),aes(x=Age))+geom_histogram(binwidth = 1,fill="#7f6000",alpha=0.8)+
+  scale_x_continuous(breaks=c(seq(20,72,10)),minor_breaks = c(seq(20,72,5)))+
+  theme(legend.position = "bottom",
+        text = element_text(size = 18,face = "bold",color="#bd0026"),
+        legend.text = element_text(size=18),
+        legend.background = element_rect(fill = "#ffffcc"),
+        axis.text = element_text(color="#000000",size=18),
+        plot.background = element_rect(fill = "#ffffcc"),
+        panel.background = element_rect(fill = NA),
+        panel.grid.major.x = element_line(color="#f1c232"),
+        panel.grid.minor.x = element_line(color="#f1c232"),
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        strip.text = element_text(color="#000000",size=18)
+        )
+
+
+# ggplot(percents, aes(fill=`Hair style`, x=Politics,y=Percent)) + 
+#   geom_bar(position="fill", stat="identity")+scale_y_continuous(labels=scales::percent_format())+
+#   scale_x_discrete(labels = function(x) str_wrap(x,width=15))+
+#   coord_flip()+
+#   #geom_text(aes(label = str_wrap(Labels,width=10)), hjust = 0,position = position_fill(vjust = 0)) +
+#   #theme_classic()+
+#   #theme_fivethirtyeight()+
+#   facet_grid(Gender3C~.)+
+#   guides(fill=guide_legend(ncol=4,reverse=TRUE))+
+#   theme(legend.position = "bottom",
+#         text = element_text(size = 18,face = "bold",color="#bd0026"),
+#         legend.text = element_text(size=18),
+#         legend.background = element_rect(fill = "#ffffcc"),
+#         axis.text = element_text(color="#000000",size=18),
+#         plot.background = element_rect(fill = "#ffffcc"),
+#         panel.background = element_rect(fill = "black"),
+#         panel.grid.major = element_blank(),
+#         panel.grid.minor = element_blank(),
+#         strip.text = element_text(color="#000000",size=18)
+#         )+
+#   scale_fill_brewer(palette = "YlOrRd")+
+#   #geom_text(aes(label=`Hair style`,y=Percent,x=Gender))+
+#   labs(title="Hair style by Gender")
+```
+Now let's do age by gender
+
+
+
+
+```{r}
+#https://davidmathlogic.com/colorblind/#%230000FF-%23F1C232-%23E31A1C-%23FFFFCC
+cust_palette_3c <-c("#0000FF","#F1C232","#E31A1C")#background=#FFFFCC
+data_per_participant$Gender3C<-factor(data_per_participant$Gender3C,levels=c("Male","Female","Non-binary"))
+ggplot(data_per_participant %>% filter(Age<80 & !is.na(Gender3C)),aes(x=Age,fill=Gender3C,color=Gender3C))+geom_histogram(binwidth = 1,alpha=0.5,position="identity")+
+  #scale_fill_viridis_d(direction=-1)+scale_color_viridis_d(direction=-1)+
+  scale_color_manual(values=cust_palette_3c)+
+  scale_fill_manual(values=cust_palette_3c)+
+  scale_x_continuous(breaks=c(seq(20,72,10)),minor_breaks = c(seq(20,72,5)))+
+  theme(legend.position = "bottom",
+        text = element_text(size = 18,face = "bold",color="#bd0026"),
+        legend.text = element_text(size=18),
+        legend.background = element_rect(fill = "#ffffcc"),
+        axis.text = element_text(color="#000000",size=18),
+        plot.background = element_rect(fill = "#ffffcc"),
+        panel.background = element_rect(fill = NA),
+        panel.grid.major.x = element_line(color="#f1c232"),
+        panel.grid.minor.x = element_line(color="#f1c232"),
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        strip.text = element_text(color="#000000",size=18)
+        )
+
+
+```
+
+

@@ -1,0 +1,269 @@
+---
+title: "Linear modeling"
+output: html_notebook
+---
+
+This document breaks down the linear modeling to assess factors that seem to be important.
+
+setup:
+
+```{r}
+source("utils.R")
+raw_dataset <- get_raw_dataset()
+
+
+```
+
+```{r}
+
+source("utils.R")
+
+data_per_participant <- create_participant_data(raw_dataset)
+straight_couple_data<-create_straight_couple_data(data_per_participant)
+```
+```{r}
+table(straight_couple_data$PubicHairGeneralPreferenceMale)/sum(table(straight_couple_data$PubicHairGeneralPreferenceMale))
+```
+
+
+```{r}
+table(straight_couple_data$PubicHairGeneralPreferenceMale)/sum(table(straight_couple_data$PubicHairGeneralPreferenceMale))
+```
+
+```{r}
+table(straight_couple_data$PubicHairGeneralPreferenceFemale)/sum(table(straight_couple_data$PubicHairGeneralPreferenceFemale))
+```
+```{r}
+
+```
+
+# Descriptive stats
+
+Graphs of stats taht we might wanna know for modeling below
+
+```{r}
+hist(data_per_participant$AgeGap[abs(data_per_participant$AgeGap)<30],breaks = -30:30)
+```
+
+```{r}
+library(ggplot2)
+
+ggplot(data_per_participant,aes(SexDominance,PartnerSexDominance))+geom_jitter(alpha=0.2)
+```
+
+
+```{r}
+ggplot(data_per_participant,aes(PoliticalLiberalism,PartnerPoliticalLiberalism))+geom_jitter(alpha=0.2)
+```
+
+```{r}
+table(straight_couple_data$MostHairRemoved12MonthsFemale,
+      straight_couple_data$MostHairRemoved12MonthsMale
+      )
+```
+
+```{r}
+do_female_male_table <- function(col_to_analyse,relevant_couple_data=straight_couple_data,percentage=FALSE){
+  female_male_matches <-data.frame(table(
+    relevant_couple_data[,paste0(col_to_analyse,"Female")],
+    relevant_couple_data[,paste0(col_to_analyse,"Male")]
+    ))
+  colnames(female_male_matches)<-c("Female","Male","Frequency")
+  
+  female_male_matches$Male<-factor(female_male_matches$Male,levels=rev(levels(female_male_matches$Male)))
+  
+  #get female totals
+  female_totals<-female_male_matches %>% group_by(Female) %>% summarize(Frequency=sum(Frequency))
+  female_totals$Male<-"Total Female"
+  
+  #get male totals
+  male_totals<-female_male_matches %>% group_by(Male) %>% summarize(Frequency=sum(Frequency))
+  male_totals$Female<-"Total Male"
+  
+  total_all<-female_male_matches%>% summarize(Frequency=sum(Frequency))
+  total_all$Male<-"Total Female"
+  total_all$Female<-"Total Male"
+  
+  #merge them all together
+  full_table<-rbind(female_male_matches,female_totals,male_totals,total_all)
+  
+  #just get the total number of couples involved
+  total_sum<-sum(female_male_matches$Frequency)
+  
+  if(percentage){
+    #plot percentages
+    
+    full_table$Percent<-round(full_table$Frequency/total_sum*100)
+    plot_base <- ggplot(full_table, aes(Female, Male)) +
+      geom_tile(data=filter(full_table,Female!="Total Male",Male!="Total Female"),aes(fill = Percent)) + 
+      geom_point(data=filter(full_table,Female=="Total Male"| Male=="Total Female"),aes(color = Percent),size=25,shape=19) + 
+      geom_text(data=full_table, aes(label = round(Percent, 1)),size=10,fontface="bold")+
+      labs(title=col_to_analyse,subtitle=paste0("Percentages out of a total of ",format(total_sum,big.mark=","), " couples"))
+  }else{
+    #plot raw frequencies
+    plot_base <- ggplot(full_table, aes(Female, Male)) +
+      geom_tile(data=filter(full_table,Female!="Total Male",Male!="Total Female"),aes(fill = Frequency)) + 
+      geom_point(data=filter(full_table,Female=="Total Male"| Male=="Total Female"),aes(color = Frequency),size=25,shape=19) + 
+      geom_text(data=full_table, aes(label = format(Frequency, big.mark=",")),size=10,fontface="bold")+
+      labs(title=col_to_analyse,subtitle=paste0("Total of ",format(total_sum,big.mark=","), " couples"))
+  }
+
+   plot_result <- plot_base+
+    scale_fill_gradient(low = "white", high = "#999900")+
+    scale_color_gradient(low = "white", high = "#666666")+
+    scale_x_discrete(limits = unique(full_table$Female), labels=function(x){str_wrap(x,width=10)},  position = "top") +
+    scale_y_discrete(limits = rev(unique(full_table$Male)), labels=function(x){str_wrap(x,width=16)}) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 12),
+    axis.text.y = element_text(size = 11, colour = "blue",face = "bold"),
+    axis.text.x = element_text(size = 11, colour = "red",face = "bold"),
+    strip.text.y = element_text(angle = 0),
+    legend.direction = "horizontal",
+    legend.position = "none",
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.background = element_rect(fill = "#ffffcc", colour = NA),
+    plot.background = element_rect(fill = "#ffffcc", colour = NA)
+  )
+   
+  print(plot_result)
+
+}
+
+```
+
+
+```{r fig.width=3, fig.height=3}
+
+#do_female_male_table("How do you currently keep your pubic hair?")
+
+do_female_male_table("How do you currently keep your pubic hair?",percentage = TRUE)
+```
+
+
+
+```{r}
+
+do_female_male_table("MostHairRemoved12Months",percentage=TRUE)
+```
+
+```{r}
+straight_couple_data$PubicHairDifference <- as.numeric(straight_couple_data$`How do you currently keep your pubic hair?Male`)-as.numeric(straight_couple_data$`How do you currently keep your pubic hair?Female`)
+difference_table<-table(straight_couple_data$PubicHairDifference)
+sum(difference_table[names(difference_table)<0])/sum(difference_table)
+sum(difference_table[names(difference_table)>0])/sum(difference_table)
+sum(difference_table[names(difference_table)==0])/sum(difference_table)
+```
+
+## Married
+
+
+
+```{r}
+
+do_female_male_table("How do you currently keep your pubic hair?",straight_couple_data %>% filter((`Relationship typeFemale` %in% c("Married"))),percentage=TRUE)
+```
+## straight couples not living together....
+
+
+
+```{r}
+
+do_female_male_table("How do you currently keep your pubic hair?",straight_couple_data %>% filter((`Relationship typeFemale` %in% c("Married","Living together"))==FALSE),percentage=TRUE)
+```
+
+
+```{r}
+
+do_female_male_table("MostHairRemoved12Months",straight_couple_data %>% filter((`Relationship typeFemale` %in% c("Married","Living together"))==FALSE),percentage=TRUE)
+```
+
+
+# General preferences
+
+No mean difference in age across different preferences
+```{r}
+data_per_participant %>% filter(Gender3C=="Male") %>% group_by(PubicHairGeneralPreference) %>% summarize(meanAge=mean(Age,na.rm=TRUE))
+
+data_per_participant %>% filter(Gender3C=="Female") %>% group_by(PubicHairGeneralPreference) %>% summarize(meanAge=mean(Age,na.rm=TRUE))
+
+```
+
+```{r, fig.width=9, fig.height=9}
+do_female_male_table("PubicHairGeneralPreference",percentage=TRUE)
+```
+
+```{r}
+hist(straight_couple_data$SexDominanceNumFemale)
+straight_couple_data$PubicHairGeneralPreferenceFemale
+table(straight_couple_data$PubicHairGeneralPreferenceNumFemale)
+straight_couple_data$
+summary(lm(as.numeric(straight_couple_data$PubicHairGeneralPreferenceNumFemale)~SexDominanceNumFemale+as.numeric(`How do you currently keep your pubic hair?Female`),straight_couple_data))
+
+summary(lm(as.numeric(straight_couple_data$PubicHairGeneralPreferenceNumFemale)~(SexDominanceNumFemale>0)+as.numeric(`How do you currently keep your pubic hair?Female`),straight_couple_data))
+
+table(straight_couple_data$SexDominanceFemale,straight_couple_data$PubicHairGeneralPreferenceFemale)
+```
+```{r}
+cor.test(straight_couple_data$SexDominanceNumFemale,straight_couple_data$AgeGapFemale)
+
+cor.test(straight_couple_data$SexDominanceNumFemale,straight_couple_data$AgeFemale)
+```
+```{r}
+straight_couple_data%>% group_by(SexDominanceFemale) %>% summarize(mean_age=mean(AgeFemale))
+
+```
+
+```{r}
+cor.test(straight_couple_data$PubicHairDifference,straight_couple_data$PoliticalLiberalismFemale)
+```
+```{r}
+mean(straight_couple_data$PubicHairDifference,na.rm = TRUE)
+```
+
+```{r}
+summary(lm(as.numeric(`How do you currently keep your pubic hair?Female`)~SexDominanceNumFemale*as.numeric(PubicHairGeneralPreferenceNumMale)+SurveyRoleFemale+PoliticalLiberalismFemale+OutsideUSAFemale+AgeCFemale+AgeCMale,straight_couple_data))
+
+
+
+```
+
+```{r}
+
+summary(lm(PubicHairDifference~SexDominanceNumFemale*+SurveyRoleFemale+PoliticalLiberalismFemale+OutsideUSAFemale+AgeCFemale+AgeCMale+`Relationship typeFemale`+`How did you find out about this survey?Female`,straight_couple_data))
+```
+
+
+```{r}
+table(straight_couple_data$SexDominanceFemale,straight_couple_data$PubicHairGeneralPreferenceFemale)
+
+table(straight_couple_data$SexDominanceFemale,straight_couple_data$PoliticalLiberalismFemale)
+
+cor.test(straight_couple_data$SexDominanceFemale,straight_couple_data$PoliticalLiberalismFemale)
+```
+
+
+```{r}
+cor.test(straight_couple_data$SexDominanceFemale,straight_couple_data$sex)
+```
+
+
+
+
+```{r}
+
+do_female_male_table("SexDominance",percentage=TRUE)
+```
+
+
+
+
+```{r}
+cor.test(as.numeric(straight_couple_data$SexDominanceFemale),straight_couple_data$PoliticalLiberalismFemale)
+```
+
+```{r}
+
+cor.test(as.numeric(straight_couple_data$SexDominanceFemale),straight_couple_data$AgeGapFemale)
+```

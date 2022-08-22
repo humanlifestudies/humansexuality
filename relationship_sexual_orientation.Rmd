@@ -1,0 +1,364 @@
+---
+title: "Linear modeling"
+output: html_notebook
+---
+
+This document breaks down the linear modeling to assess factors that seem to be important.
+
+setup:
+
+```{r}
+source("utils.R")
+raw_dataset <- get_raw_dataset()
+```
+
+```{r}
+
+source("utils.R")
+
+data_per_participant <- create_participant_data(raw_dataset)
+data_per_participant_early <- create_participant_data(raw_dataset[1:430,])
+
+```
+
+# Descriptive stats
+
+Graphs of stats taht we might wanna know for modeling below
+
+```{r}
+hist(data_per_participant$AgeGap[abs(data_per_participant$AgeGap)<30],breaks = -30:30)
+```
+
+# Sexual orientation data quality check
+
+
+```{r}
+
+data_per_participant$ConsecSet <- floor((1:nrow(data_per_participant))/200)*200
+table(data_per_participant$HeteroRShip,data_per_participant$ConsecSet)
+table(data_per_participant$SameSex,data_per_participant$ConsecSet)
+
+
+```
+Seems relatively constant throughout the set which is helpful.
+
+
+```{r}
+table(data_per_participant$SexualOrientation)
+```
+
+# from prior
+
+# non-hetero relationships
+
+```{r}
+
+
+
+## non-hetero relationships
+data_per_participant_nh <- data_per_participant[data_per_participant$HeteroRShip==FALSE,]
+percents_nh <- data.frame(
+  table(data_per_participant_nh$`How do you currently keep your pubic hair?`,data_per_participant_nh$Gender3C)/rep(table(data_per_participant_nh$Gender3C),each=4)
+)
+
+counts_nh <- data.frame(
+  table(data_per_participant_nh$`How do you currently keep your pubic hair?`,data_per_participant_nh$Gender3C)#/rep(table(data_per_participant_nh$Gender),each=4)
+)
+
+colnames(counts_nh) <- c("Hair style","Gender3C","Count")
+
+
+ggplot(counts_nh, aes(fill=`Hair style`, x=Gender3C,y=Count)) + 
+  geom_bar(stat="identity")+#scale_y_continuous(labels=scales::percent_format())+
+  coord_flip()+
+  #theme_classic()+
+  #theme_fivethirtyeight()+
+  guides(fill=guide_legend(ncol=4,reverse=TRUE))+
+  theme(legend.position = "bottom",text = element_text(size = 18,face = "bold"))+
+  scale_fill_brewer(palette = "YlOrRd")+
+  #geom_text(aes(label=`Hair style`,y=Percent,x=Gender))+
+  labs(title="Hair style by Gender",subtitle="People in non-HeteroRShip relationships")
+
+
+## same-sex relationships
+data_per_participant_nh <- data_per_participant[data_per_participant$SameSex==TRUE,]
+
+counts_nh <- data.frame(
+  table(data_per_participant_nh$`How do you currently keep your pubic hair?`,data_per_participant_nh$Gender3C)#/rep(table(data_per_participant_nh$Gender),each=4)
+)
+
+colnames(counts_nh) <- c("Hair style","Gender3C","Count")
+
+
+ggplot(counts_nh, aes(fill=`Hair style`, x=Gender3C,y=Count)) + 
+  geom_bar(stat="identity")+#scale_y_continuous(labels=scales::percent_format())+
+  coord_flip()+
+  #theme_classic()+
+  #theme_fivethirtyeight()+
+  guides(fill=guide_legend(ncol=4,reverse=TRUE))+
+  theme(legend.position = "bottom",text = element_text(size = 18,face = "bold"))+
+  scale_fill_brewer(palette = "YlOrRd")+
+  #geom_text(aes(label=`Hair style`,y=Percent,x=Gender))+
+  labs(title="Hair style by Gender",subtitle="People in same-sex relationships")
+
+```
+# same-sex vs. straight comparison 
+
+This is based on relationship the person is in. not self-reported sexuality, which we only recorded late in the game.
+```{r, fig.width=14,fig.height=7}
+
+data_per_participant_sss <- data_per_participant[
+  (data_per_participant$SameSex==TRUE | data_per_participant$HeteroRShip==TRUE) & 
+    data_per_participant$Gender3C!="Non-binary" & 
+    !is.na(data_per_participant$`How do you currently keep your pubic hair?`)
+    ,]
+
+data_per_participant_sss$Gender3C<-factor(data_per_participant_sss$Gender3C,c("Male","Female"))
+
+counts_sss <- data.frame(
+  table(data_per_participant_sss$`How do you currently keep your pubic hair?`,
+        data_per_participant_sss$Gender3C,
+        data_per_participant_sss$HeteroRShip)
+)
+
+colnames(counts_sss) <- c("Hair style","Gender3C","Straight","Count")
+
+pc_sss <- data.frame(
+  table(data_per_participant_sss$`How do you currently keep your pubic hair?`,
+        data_per_participant_sss$Gender3C,
+        data_per_participant_sss$HeteroRShip)/rep(table(data_per_participant_sss$Gender3C,data_per_participant_sss$HeteroRShip),each=4)
+)
+group_counts <- data.frame(table(
+        data_per_participant_sss$Gender3C,
+        data_per_participant_sss$HeteroRShip))
+
+colnames(pc_sss) <- c("Hair style","Gender3C","Straight","Count")
+
+pc_sss <- pc_sss%>% arrange(Gender3C,Straight)
+labels <- c("Men (Male partner)","Men (Female partner)","Women (Female partner)","Women (Male partner)")
+pc_sss$Label <- factor(
+  rep(labels,each=4),
+  labels)
+
+men<-data_per_participant %>% filter(Gender3C=="Male" & (HeteroRShip | SameSex))
+pc_sss$`Hair style`<-factor(pc_sss$`Hair style`,levels=rev(levels(pc_sss$`Hair style`)))
+ggplot(pc_sss, aes(fill=`Hair style`, x=str_wrap(Label,16),y=Count)) + 
+#ggplot(pc_sss, aes(fill=`Hair style`, x=interaction(Gender,Straight),y=Count)) + 
+  geom_bar(stat="identity")+scale_y_continuous(labels=scales::percent_format())+
+ scale_x_discrete(name="")+
+  coord_flip()+
+  #theme_classic()+
+  #theme_fivethirtyeight()+
+  guides(fill=guide_legend(ncol=4,reverse=TRUE))+
+  theme(legend.position = "bottom",text = element_text(size = 18,face = "bold"))+
+  theme(legend.position = "bottom",
+        text = element_text(size = 18,face = "bold",color="#bd0026"),
+        legend.text = element_text(size=22),
+        legend.background = element_rect(fill = "#ffffcc"),
+        axis.text = element_text(color="#000000",size=22),
+        plot.background = element_rect(fill = "#ffffcc"),
+        panel.background = element_rect(fill = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
+  )+
+  scale_fill_brewer(palette = "YlOrRd")+
+  labs(title="Hair style and Sexuality")
+counts_sss
+
+```
+## Including non-binary participants
+
+```{r, fig.width=12,fig.height=8}
+
+data_per_participant_cleaned <- data_per_participant[
+  #(data_per_participant$SameSex==TRUE | data_per_participant$HeteroRShip==TRUE) & 
+    #data_per_participant$Gender3C!="Non-binary" & 
+    !is.na(data_per_participant$`How do you currently keep your pubic hair?`)
+    ,]
+
+counts_crosstabs<-  table(data_per_participant_cleaned$`How do you currently keep your pubic hair?`,
+        data_per_participant_cleaned$Gender3C,
+        data_per_participant_cleaned$PartnerGender3C)
+
+counts_nb <- data.frame(
+  counts_crosstabs
+)
+
+colnames(counts_nb) <- c("Hair style","Gender3C","PartnerGender3C","Count")
+
+pc_sss <- data.frame(
+  counts_crosstabs/rep(table(data_per_participant_cleaned$Gender3C,data_per_participant_cleaned$PartnerGender3C),each=4)
+)
+
+
+colnames(pc_sss) <- c("Hair style","Gender3C","PartnerGender3C","Count")
+
+#pc_sss <- pc_sss%>% arrange(desc(PartnerGender3C),desc(Gender3C))
+pc_sss <- pc_sss%>% arrange(Gender3C,PartnerGender3C)
+
+#labels<-str_wrap(paste0(pc_sss$Gender3C, " (",pc_sss$PartnerGender3C," partner)"),16)
+#labels<-paste0(pc_sss$Gender3C, "\n(",pc_sss$PartnerGender3C," partner)")
+labels<-paste0("...",pc_sss$PartnerGender3C," partner")
+
+pc_sss$Label <- factor(labels,levels = rev(unique(labels)))
+
+pc_sss$strip_labels<-paste0(pc_sss$Gender3C, " with...")
+pc_sss$`Hair style`<-factor(pc_sss$`Hair style`,levels=rev(levels(pc_sss$`Hair style`)))
+ggplot(pc_sss, aes(fill=`Hair style`, x=Label,y=Count)) + 
+  geom_bar(stat="identity")+scale_y_continuous(labels=scales::percent_format())+
+ scale_x_discrete(name="")+
+  coord_flip()+
+  #theme_classic()+
+  #theme_fivethirtyeight()+
+  facet_wrap(strip_labels~.,scales = "free",ncol=1)+
+  guides(fill=guide_legend(nrow=2,byrow=TRUE,reverse=TRUE))+
+  theme(legend.position = "bottom",text = element_text(size = 16,face = "bold"))+
+  theme(legend.position = "bottom",
+        text = element_text(size = 16,face = "bold",color="#bd0026"),
+        legend.text = element_text(size=16),
+        legend.background = element_rect(fill = "#ffffcc"),
+        axis.text = element_text(color="#000000",size=16),
+        plot.background = element_rect(fill = "#ffffcc"),
+        panel.background = element_rect(fill = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_rect(fill="#000000"),
+        strip.text = element_text(color="#ffffff",size=16)
+  )+
+  scale_fill_brewer(palette = "YlOrRd")+
+  labs(title="Hair style and Sexuality")
+counts_sss
+
+```
+
+
+## Repeating that but from the early data
+
+
+```{r}
+
+data_per_participant_sss <- data_per_participant_early[
+  (data_per_participant_early$SameSex==TRUE | data_per_participant_early$HeteroRShip==TRUE) & 
+    data_per_participant_early$Gender3C!="Non-binary" & 
+    !is.na(data_per_participant_early$`How do you currently keep your pubic hair?`)
+    ,]
+
+data_per_participant_sss$Gender3C<-factor(data_per_participant_sss$Gender3C,c("Male","Female"))
+
+counts_sss <- data.frame(
+  table(data_per_participant_sss$`How do you currently keep your pubic hair?`,
+        data_per_participant_sss$Gender3C,
+        data_per_participant_sss$HeteroRShip)
+)
+colnames(counts_sss) <- c("Hair style","Gender3C","Straight","Count")
+
+pc_sss <- data.frame(
+  table(data_per_participant_sss$`How do you currently keep your pubic hair?`,
+        data_per_participant_sss$Gender3C,
+        data_per_participant_sss$HeteroRShip)/rep(table(data_per_participant_sss$Gender3C,data_per_participant_sss$HeteroRShip),each=4)
+)
+
+colnames(pc_sss) <- c("Hair style","Gender3C","Straight","Count")
+
+pc_sss <- pc_sss%>% arrange(Gender3C,Straight)
+labels <- c("Gay Men","Straight Men","Lesbian Women","Straight Women")
+pc_sss$Label <- factor(
+  rep(labels,each=4),
+  labels)
+
+
+ggplot(pc_sss, aes(fill=`Hair style`, x=Label,y=Count)) + 
+#ggplot(pc_sss, aes(fill=`Hair style`, x=interaction(Gender,Straight),y=Count)) + 
+  geom_bar(stat="identity")+scale_y_continuous(labels=scales::percent_format())+
+ scale_x_discrete(name="")+
+  coord_flip()+
+  #theme_classic()+
+  #theme_fivethirtyeight()+
+  guides(fill=guide_legend(ncol=4,reverse=TRUE))+
+  theme(legend.position = "bottom",text = element_text(size = 18,face = "bold"))+
+  theme(legend.position = "bottom",
+        text = element_text(size = 18,face = "bold",color="#bd0026"),
+        legend.text = element_text(size=22),
+        legend.background = element_rect(fill = "#ffffcc"),
+        axis.text = element_text(color="#000000",size=22),
+        plot.background = element_rect(fill = "#ffffcc"),
+        panel.background = element_rect(fill = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
+  )+
+  scale_fill_brewer(palette = "YlOrRd")+
+  labs(title="Hair style and Sexuality",subtitle = "Early participants")
+
+
+```
+
+## Repeating that but from self-reported sexual oriengation
+
+
+
+```{r}
+# 
+# data_per_participant_sss <- data_per_participant[
+#   (data_per_participant$SameSex==TRUE | data_per_participant$HeteroRShip==TRUE) & 
+#     data_per_participant$Gender3C!="Non-binary" & 
+#     !is.na(data_per_participant$`How do you currently keep your pubic hair?`)
+#     ,]
+# 
+# data_per_participant_sss$Gender3C<-factor(data_per_participant_sss$Gender3C,c("Male","Female"))
+# 
+# counts_sss <- data.frame(
+#   table(data_per_participant_sss$`How do you currently keep your pubic hair?`,
+#         data_per_participant_sss$Gender3C,
+#         data_per_participant_sss$HeteroRShip)
+# )
+table(data_per_participant$Gender3C,data_per_participant$SexualOrientation6C)
+
+data_per_participant_slgb<-data_per_participant %>% filter(
+  SexualOrientation6C %in% c("Straight","Lesbian","Gay","Bisexual","Pansexual") & 
+    (Gender3C!="Non-binary")
+  )
+
+pc_so <- data.frame(
+  table(data_per_participant_slgb$`How do you currently keep your pubic hair?`,
+        data_per_participant_slgb$Gender3C,
+        data_per_participant_slgb$SexualOrientation6C)/rep(table(data_per_participant_slgb$Gender3C,data_per_participant_slgb$SexualOrientation6C),each=4)
+)
+
+colnames(pc_so) <- c("Hair style","Gender3C","Sexual Orientation","Count")
+
+pc_so<- pc_so[is.nan(pc_so$Count)==FALSE,]
+#pc_so<- pc_so[pc_so$Count>10,]
+#pc_sss <- pc_sss%>% arrange(Gender3C,Straight)
+#labels <- c("Gay Men","Straight Men","Lesbian Women","Straight Women")
+# pc_sss$Label <- factor(
+#   rep(labels,each=4),
+#   labels)
+
+
+ggplot(pc_so, aes(fill=`Hair style`, x=interaction(`Sexual Orientation`,Gender3C),y=Count)) + 
+#ggplot(pc_sss, aes(fill=`Hair style`, x=interaction(Gender,Straight),y=Count)) + 
+  geom_bar(stat="identity")+scale_y_continuous(labels=scales::percent_format())+
+ scale_x_discrete(name="")+
+  coord_flip()+
+  #theme_classic()+
+  #theme_fivethirtyeight()+
+  guides(fill=guide_legend(ncol=4,reverse=TRUE))+
+  theme(legend.position = "bottom",text = element_text(size = 18,face = "bold"))+
+  theme(legend.position = "bottom",
+        text = element_text(size = 18,face = "bold",color="#bd0026"),
+        legend.text = element_text(size=22),
+        legend.background = element_rect(fill = "#ffffcc"),
+        axis.text = element_text(color="#000000",size=22),
+        plot.background = element_rect(fill = "#ffffcc"),
+        panel.background = element_rect(fill = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
+  )+
+  scale_fill_brewer(palette = "YlOrRd")+
+  labs(title="Hair style and Sexuality")
+
+
+```
+
+
+
